@@ -1,4 +1,4 @@
-var BERGAMOT_VERSION_FULL = "v0.3.1+c7b626d";
+var BERGAMOT_VERSION_FULL = "v0.3.1+446fd35";
 
 var Module = typeof Module !== "undefined" ? Module : {};
 
@@ -704,12 +704,14 @@ function getBinaryPromise() {
 function createWasm() {
  var info = {
   "env": asmLibraryArg,
+    "wasm_gemm": createWasmGemm(),
   "wasi_snapshot_preview1": asmLibraryArg
  };
  function receiveInstance(instance, module) {
   var exports = instance.exports;
   Module["asm"] = exports;
   wasmTable = Module["asm"]["__indirect_function_table"];
+  exportAsmFunctions(exports);
   removeRunDependency("wasm-instantiate");
  }
  addRunDependency("wasm-instantiate");
@@ -803,6 +805,18 @@ function dynCall(sig, ptr, args) {
  return wasmTable.get(ptr).apply(null, args);
 }
 
+function exportAsmFunctions(asm) {
+ var asmjsMangle = function(x) {
+  var unmangledSymbols = [ "setTempRet0", "getTempRet0", "stackAlloc", "stackSave", "stackRestore" ];
+  return x.indexOf("dynCall_") == 0 || unmangledSymbols.indexOf(x) != -1 ? x : "_" + x;
+ };
+ var global_object = this;
+ for (var __exportedFunc in asm) {
+  var jsname = asmjsMangle(__exportedFunc);
+  global_object[jsname] = Module[jsname] = asm[__exportedFunc];
+ }
+}
+
 function jsStackTrace() {
  var error = new Error();
  if (!error.stack) {
@@ -873,6 +887,28 @@ function ___cxa_atexit(a0, a1) {
  return _atexit(a0, a1);
 }
 
+var exceptionCaught = [];
+
+var exceptionLast = 0;
+
+var uncaughtExceptionCount = 0;
+
+function ___cxa_rethrow() {
+ var catchInfo = exceptionCaught.pop();
+ var info = catchInfo.get_exception_info();
+ var ptr = catchInfo.get_base_ptr();
+ if (!info.get_rethrown()) {
+  exceptionCaught.push(catchInfo);
+  info.set_rethrown(true);
+  info.set_caught(false);
+  uncaughtExceptionCount++;
+ } else {
+  catchInfo.free();
+ }
+ exceptionLast = ptr;
+ throw ptr;
+}
+
 function ___cxa_thread_atexit(a0, a1) {
  return _atexit(a0, a1);
 }
@@ -926,10 +962,6 @@ function ExceptionInfo(excPtr) {
   return prev === 1;
  };
 }
-
-var exceptionLast = 0;
-
-var uncaughtExceptionCount = 0;
 
 function ___cxa_throw(ptr, type, destructor) {
  var info = new ExceptionInfo(ptr);
@@ -5307,6 +5339,41 @@ function _getentropy(buffer, size) {
  return 0;
 }
 
+function _int8_multiply_and_add_bias() {
+ err("missing function: int8_multiply_and_add_bias");
+ abort(-1);
+}
+
+function _int8_prepare_a() {
+ err("missing function: int8_prepare_a");
+ abort(-1);
+}
+
+function _int8_prepare_b() {
+ err("missing function: int8_prepare_b");
+ abort(-1);
+}
+
+function _int8_prepare_b_from_quantized_transposed() {
+ err("missing function: int8_prepare_b_from_quantized_transposed");
+ abort(-1);
+}
+
+function _int8_prepare_b_from_transposed() {
+ err("missing function: int8_prepare_b_from_transposed");
+ abort(-1);
+}
+
+function _int8_prepare_bias() {
+ err("missing function: int8_prepare_bias");
+ abort(-1);
+}
+
+function _int8_select_columns_of_b() {
+ err("missing function: int8_select_columns_of_b");
+ abort(-1);
+}
+
 function _tzset() {
  if (_tzset.called) return;
  _tzset.called = true;
@@ -5389,6 +5456,15 @@ function _pthread_join() {}
 
 function _setTempRet0($i) {
  setTempRet0($i | 0);
+}
+
+function _sigaction(signum, act, oldact) {
+ return 0;
+}
+
+function _sigemptyset(set) {
+ HEAP32[set >> 2] = 0;
+ return 0;
 }
 
 function __isLeapYear(year) {
@@ -5974,6 +6050,7 @@ var asmLibraryArg = {
  "__clock_gettime": ___clock_gettime,
  "__cxa_allocate_exception": ___cxa_allocate_exception,
  "__cxa_atexit": ___cxa_atexit,
+ "__cxa_rethrow": ___cxa_rethrow,
  "__cxa_thread_atexit": ___cxa_thread_atexit,
  "__cxa_throw": ___cxa_throw,
  "__sys_access": ___sys_access,
@@ -6021,106 +6098,28 @@ var asmLibraryArg = {
  "fd_seek": _fd_seek,
  "fd_write": _fd_write,
  "getentropy": _getentropy,
+ "int8_multiply_and_add_bias": _int8_multiply_and_add_bias,
+ "int8_prepare_a": _int8_prepare_a,
+ "int8_prepare_b": _int8_prepare_b,
+ "int8_prepare_b_from_quantized_transposed": _int8_prepare_b_from_quantized_transposed,
+ "int8_prepare_b_from_transposed": _int8_prepare_b_from_transposed,
+ "int8_prepare_bias": _int8_prepare_bias,
+ "int8_select_columns_of_b": _int8_select_columns_of_b,
  "localtime_r": _localtime_r,
  "memory": wasmMemory,
  "nanosleep": _nanosleep,
  "pthread_create": _pthread_create,
  "pthread_join": _pthread_join,
  "setTempRet0": _setTempRet0,
+ "sigaction": _sigaction,
+ "sigemptyset": _sigemptyset,
  "strftime_l": _strftime_l,
  "sysconf": _sysconf,
- "time": _time
+ "time": _time,
+ "tzset": _tzset
 };
 
 var asm = createWasm();
-
-var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
- return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["__wasm_call_ctors"]).apply(null, arguments);
-};
-
-var _free = Module["_free"] = function() {
- return (_free = Module["_free"] = Module["asm"]["free"]).apply(null, arguments);
-};
-
-var _malloc = Module["_malloc"] = function() {
- return (_malloc = Module["_malloc"] = Module["asm"]["malloc"]).apply(null, arguments);
-};
-
-var _memset = Module["_memset"] = function() {
- return (_memset = Module["_memset"] = Module["asm"]["memset"]).apply(null, arguments);
-};
-
-var ___errno_location = Module["___errno_location"] = function() {
- return (___errno_location = Module["___errno_location"] = Module["asm"]["__errno_location"]).apply(null, arguments);
-};
-
-var ___getTypeName = Module["___getTypeName"] = function() {
- return (___getTypeName = Module["___getTypeName"] = Module["asm"]["__getTypeName"]).apply(null, arguments);
-};
-
-var ___embind_register_native_and_builtin_types = Module["___embind_register_native_and_builtin_types"] = function() {
- return (___embind_register_native_and_builtin_types = Module["___embind_register_native_and_builtin_types"] = Module["asm"]["__embind_register_native_and_builtin_types"]).apply(null, arguments);
-};
-
-var __get_tzname = Module["__get_tzname"] = function() {
- return (__get_tzname = Module["__get_tzname"] = Module["asm"]["_get_tzname"]).apply(null, arguments);
-};
-
-var __get_daylight = Module["__get_daylight"] = function() {
- return (__get_daylight = Module["__get_daylight"] = Module["asm"]["_get_daylight"]).apply(null, arguments);
-};
-
-var __get_timezone = Module["__get_timezone"] = function() {
- return (__get_timezone = Module["__get_timezone"] = Module["asm"]["_get_timezone"]).apply(null, arguments);
-};
-
-var stackSave = Module["stackSave"] = function() {
- return (stackSave = Module["stackSave"] = Module["asm"]["stackSave"]).apply(null, arguments);
-};
-
-var stackRestore = Module["stackRestore"] = function() {
- return (stackRestore = Module["stackRestore"] = Module["asm"]["stackRestore"]).apply(null, arguments);
-};
-
-var stackAlloc = Module["stackAlloc"] = function() {
- return (stackAlloc = Module["stackAlloc"] = Module["asm"]["stackAlloc"]).apply(null, arguments);
-};
-
-var _setThrew = Module["_setThrew"] = function() {
- return (_setThrew = Module["_setThrew"] = Module["asm"]["setThrew"]).apply(null, arguments);
-};
-
-var _memalign = Module["_memalign"] = function() {
- return (_memalign = Module["_memalign"] = Module["asm"]["memalign"]).apply(null, arguments);
-};
-
-var _emscripten_main_thread_process_queued_calls = Module["_emscripten_main_thread_process_queued_calls"] = function() {
- return (_emscripten_main_thread_process_queued_calls = Module["_emscripten_main_thread_process_queued_calls"] = Module["asm"]["emscripten_main_thread_process_queued_calls"]).apply(null, arguments);
-};
-
-var dynCall_viijii = Module["dynCall_viijii"] = function() {
- return (dynCall_viijii = Module["dynCall_viijii"] = Module["asm"]["dynCall_viijii"]).apply(null, arguments);
-};
-
-var dynCall_ji = Module["dynCall_ji"] = function() {
- return (dynCall_ji = Module["dynCall_ji"] = Module["asm"]["dynCall_ji"]).apply(null, arguments);
-};
-
-var dynCall_jiji = Module["dynCall_jiji"] = function() {
- return (dynCall_jiji = Module["dynCall_jiji"] = Module["asm"]["dynCall_jiji"]).apply(null, arguments);
-};
-
-var dynCall_iiiiij = Module["dynCall_iiiiij"] = function() {
- return (dynCall_iiiiij = Module["dynCall_iiiiij"] = Module["asm"]["dynCall_iiiiij"]).apply(null, arguments);
-};
-
-var dynCall_iiiiijj = Module["dynCall_iiiiijj"] = function() {
- return (dynCall_iiiiijj = Module["dynCall_iiiiijj"] = Module["asm"]["dynCall_iiiiijj"]).apply(null, arguments);
-};
-
-var dynCall_iiiiiijj = Module["dynCall_iiiiiijj"] = function() {
- return (dynCall_iiiiiijj = Module["dynCall_iiiiiijj"] = Module["asm"]["dynCall_iiiiiijj"]).apply(null, arguments);
-};
 
 Module["addOnPreMain"] = addOnPreMain;
 
@@ -6192,3 +6191,28 @@ if (Module["preInit"]) {
 noExitRuntime = true;
 
 run();
+
+/* Use an optimized gemm implementation if available, otherwise use the fallback
+ * implementation.
+ */
+function createWasmGemm() {
+    const OPTIMIZED_GEMM = "mozIntGemm";
+    const FALLBACK_GEMM =  "asm";
+
+    if (WebAssembly[OPTIMIZED_GEMM]) {
+        console.log(`Using optimized gemm (${OPTIMIZED_GEMM}) implementation`);
+        return new WebAssembly.Instance(WebAssembly[OPTIMIZED_GEMM](), {"": {memory: wasmMemory}}).exports;
+    }
+    else {
+        console.log(`Using fallback gemm implementation`);
+        return {
+            "int8_prepare_a": (...a) => Module[FALLBACK_GEMM]["int8PrepareAFallback"](...a),
+            "int8_prepare_b": (...a) => Module[FALLBACK_GEMM]["int8PrepareBFallback"](...a),
+            "int8_prepare_b_from_transposed": (...a) => Module[FALLBACK_GEMM]["int8PrepareBFromTransposedFallback"](...a),
+            "int8_prepare_b_from_quantized_transposed": (...a) => Module[FALLBACK_GEMM]["int8PrepareBFromQuantizedTransposedFallback"](...a),
+            "int8_prepare_bias": (...a) => Module[FALLBACK_GEMM]["int8PrepareBiasFallback"](...a),
+            "int8_multiply_and_add_bias": (...a) => Module[FALLBACK_GEMM]["int8MultiplyAndAddBiasFallback"](...a),
+            "int8_select_columns_of_b": (...a) => Module[FALLBACK_GEMM]["int8SelectColumnsOfBFallback"](...a)
+        }
+    }
+}
